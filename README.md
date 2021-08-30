@@ -1,6 +1,6 @@
 # app-ui
 ## How to Use?
-* Useing the command
+* Using the command <br>
 `cd app-ui` <br>
 `npm install` <br>
 `cd app-ui` <br>
