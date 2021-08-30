@@ -1,4 +1,6 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
+import axios from "axios";
+
 import {
   DiagramWidget,
   DiagramEngine,
@@ -12,12 +14,65 @@ import {
 
 import "./style.css";
 
-class BasicConnection extends React.Component {
-  componentWillMount() {
-    this.engine = new DiagramEngine();
+const BasicConnection = () => {
+  let data = {
+    "components": [],
+    "links": [],
+  };
+  const [state, setState] = useState(data);
+  const engine = new DiagramEngine();
 
-    this.engine.registerNodeFactory(new DefaultNodeFactory());
-    this.engine.registerLinkFactory(new DefaultLinkFactory());
+  const updateComponents = (id1, id2) => {
+	const comp = state['components'];
+	const links = state['links'];
+	comp.push({
+		"id": id1,      
+		"name": "Source"
+	})
+	comp.push({
+		"id": id2,
+		"name": "Destination"
+	})
+	links.push({"src": id1, "dest": id2});
+	data['components'] = comp;
+	data['links'] = links;
+	setState(data);
+	sendState(data);
+  }
+
+  const updateState = (e) => {
+	const component = state["components"];
+    const links = state["links"];
+	const link = {"src": e.sourcePort.id, "dest": undefined};
+	
+	if(e.targetPort) link['dest'] = e.targetPort.id
+	links.push(link);
+	data["components"] = component;
+	data["links"] = links;
+	setState(data);
+	sendState(state);
+  };
+  
+  const sendState = state => {
+	axios({
+		method: "post",
+		url: "http://localhost:3000/api/state/cache",
+		data: state,
+		headers: {
+		  "Content-Type": "application/json"
+		}
+	  })
+	  .then(function (response) {
+		console.log(response.data);
+	  })
+	  .catch(function (error) {
+		console.log(error);
+	  });
+  }
+
+  useEffect(() => {
+    engine.registerNodeFactory(new DefaultNodeFactory());
+    engine.registerLinkFactory(new DefaultLinkFactory());
 
     const model = new DiagramModel();
 
@@ -31,6 +86,8 @@ class BasicConnection extends React.Component {
     node2.x = 400;
     node2.y = 100;
 
+	updateComponents(node1.id, node2.id)
+
     const link1 = new LinkModel();
     link1.setSourcePort(port1);
     link1.setTargetPort(port2);
@@ -39,45 +96,48 @@ class BasicConnection extends React.Component {
     model.addNode(node2);
     model.addLink(link1);
 
-    this.engine.setDiagramModel(model);
-    this.changeSelection(node1);
-    this.changeSelection(node2);
+	//some events listeners
+    engine.setDiagramModel(model);
+    changeSelection(node1);
+    changeSelection(node2);
 
     model.addListener({
       nodesUpdated: function (e) {
-		console.log('event occured')
+        eventOccur();
       },
       zoomUpdated: function (e) {
-		console.log('event occured')
+        eventOccur();
       },
-	  gridUpdated: (e) => {
-		console.log('event occured') 
-	  },
-	  linksUpdated: (e) => {
-		console.log(e)
-		console.log('event occured') 
-	  },
-	  offsetUpdated: (e) => {
-		console.log('event occured') 
-	  }
+      gridUpdated: (e) => {
+        eventOccur();
+      },
+      linksUpdated: (e) => {
+        eventOccur();
+        updateState(e);
+      },
+      offsetUpdated: (e) => {
+        eventOccur();
+      },
     });
-  }
+  });
 
-  changeSelection(node) {
+  const eventOccur = () => {
+    console.log("event occured");
+  };
+
+  const changeSelection = (node) => {
     node.addListener({
       selectionChanged: () => {
-        console.log("selectionChanged");
+        console.log("selection changed");
       },
     });
-  }
+  };
 
-  render() {
-    return (
-      <div>
-        <DiagramWidget diagramEngine={this.engine} />
-      </div>
-    );
-  }
-}
+  return (
+    <div>
+      <DiagramWidget diagramEngine={engine} />
+    </div>
+  );
+};
 
 export default BasicConnection;
